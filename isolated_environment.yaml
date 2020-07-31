@@ -1,0 +1,75 @@
+heat_template_version: 2016-10-14
+
+parameters:
+  image:
+    type: string
+  router:
+    type: string
+  security_group:
+    type: string
+  network:
+    type: string
+  whitelist_ip:
+    type: string
+  index:
+    type: string
+  public_network:
+    type: string
+
+resources:
+  subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network: { get_param: network }
+      cidr:
+        str_replace:
+          template: 192.168.$n.0/24
+          params:
+            $n: { get_param: index }
+      gateway_ip:
+        str_replace:
+          template: 192.168.$n.1
+          params:
+            $n: { get_param: index }
+      allocation_pools:
+        - start:
+            str_replace:
+              template: 192.168.$n.2
+              params:
+                $n: { get_param: index }
+          end: 
+            str_replace:
+                template: 192.168.$n.100
+                params:
+                  $n: { get_param: index }
+
+  router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router: {get_param: router}
+      subnet: {get_resource: subnet }
+    
+  server:
+    type: OS::Nova::Server
+    properties:
+      flavor: c1.c1r1
+      block_device_mapping_v2: 
+        - device_name: vda
+          device_type: disk
+          boot_index: 0
+          volume_size: 20
+          image: { get_param: image }
+          delete_on_termination: True
+          boot_index: 0
+      networks:
+        - network: { get_param: network }
+      security_groups: [{ get_param: security_group }]
+
+  public_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: {get_param: public_network}
+      port_id: {get_attr: [server, addresses, {get_param: network}, 0, port]}
+
+        
+  
